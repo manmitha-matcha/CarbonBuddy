@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CarbonBuddy 🌱
 
 A modern, precise, and eco-friendly web application that helps users measure, understand, and reduce their carbon footprint. Built with React, Vite, TailwindCSS, and Firebase.
@@ -208,3 +209,6 @@ For support, email support@carbonbuddy.app or create an issue in the repository.
 ---
 
 **CarbonBuddy** - Your everyday companion for a greener tomorrow 🌱
+=======
+# CarbonBuddy
+>>>>>>> bcff0ec42dc37405d8b4d13812b8611e9dc8fbe6
