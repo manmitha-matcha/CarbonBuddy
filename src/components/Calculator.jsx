@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Car, Zap, Plane, Utensils, Home, Droplets, Wind, Bike, Bus, Users, Star, Battery } from 'lucide-react';
 import StarRating from './StarRating';
+import { useAuth } from '../contexts/AuthContext';
+import CarbonFootprintService from '../firebase/database';
+import toast from 'react-hot-toast';
 
 const CO2_FACTORS = {
   transport: {
@@ -40,6 +43,8 @@ const CO2_FACTORS = {
 };
 
 export default function Calculator({ onCalculate }) {
+  const { currentUser } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     // Transport
     transportType: 'car',
@@ -149,12 +154,17 @@ export default function Calculator({ onCalculate }) {
       const kwh = (totalWatts * 30) / 1000; // 30 days
       emissions.electricity = kwh * CO2_FACTORS.electricity;
     } else if (formData.electricityUsage) {
-      // Direct electricity usage
-      emissions.electricity = parseFloat(formData.electricityUsage) * CO2_FACTORS.electricity;
+      // Direct electricity usage - convert hours to kWh
+      // Assuming average household power consumption of 1kW per hour
+      const dailyKwh = parseFloat(formData.electricityUsage) * 1; // 1kW per hour
+      const monthlyKwh = dailyKwh * 30; // 30 days
+      emissions.electricity = monthlyKwh * CO2_FACTORS.electricity;
     } else {
       // Default estimation based on household type
-      const defaultUsage = formData.householdType === 'urban' ? 100 : 40; // kWh/month
-      emissions.electricity = defaultUsage * CO2_FACTORS.electricity;
+      const defaultHours = formData.householdType === 'urban' ? 10 : 5; // hours per day
+      const dailyKwh = defaultHours * 1; // 1kW per hour
+      const monthlyKwh = dailyKwh * 30; // 30 days
+      emissions.electricity = monthlyKwh * CO2_FACTORS.electricity;
     }
 
     // Flight emissions (assuming average speed of 800 km/h)
@@ -188,9 +198,30 @@ export default function Calculator({ onCalculate }) {
     return emissions;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const emissions = calculateEmissions();
+    
+    // Save to database if user is logged in
+    if (currentUser) {
+      setIsSaving(true);
+      try {
+        const footprintData = {
+          formData,
+          emissions,
+          calculatedAt: new Date().toISOString()
+        };
+        
+        await CarbonFootprintService.saveFootprintData(currentUser.uid, footprintData);
+        toast.success('Carbon footprint data saved successfully!');
+      } catch (error) {
+        console.error('Error saving footprint data:', error);
+        toast.error('Failed to save data. Please try again.');
+      } finally {
+        setIsSaving(false);
+      }
+    }
+    
     onCalculate(emissions);
   };
 
@@ -437,7 +468,7 @@ export default function Calculator({ onCalculate }) {
                   onChange={() => setFormData(prev => ({ ...prev, applianceEstimation: false }))}
                   className="mr-2"
                 />
-                <span className="text-sm font-medium text-gray-700">Direct Usage</span>
+                <span className="text-sm font-medium text-gray-700">Daily Hours</span>
               </label>
               <label className="flex items-center">
                 <input
@@ -454,7 +485,7 @@ export default function Calculator({ onCalculate }) {
             {!formData.applianceEstimation ? (
           <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Monthly Electricity Usage (kWh)
+                  Hours of Electricity Consumption (per day)
             </label>
             <input
               type="number"
@@ -462,10 +493,10 @@ export default function Calculator({ onCalculate }) {
               value={formData.electricityUsage}
               onChange={handleChange}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                  placeholder="e.g., 80"
+                  placeholder="e.g., 8"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  💡 Urban: ~80-120 kWh/month | Rural: ~40 kWh/month
+                  💡 Average daily hours of electricity consumption (Urban: ~8-12 hours | Rural: ~4-6 hours)
                 </p>
               </div>
             ) : (
@@ -805,9 +836,12 @@ export default function Calculator({ onCalculate }) {
 
         <button
           type="submit"
-          className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 px-6 rounded-xl hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-4 focus:ring-green-300 focus:ring-offset-2 transition-all duration-300 transform hover:scale-105 shadow-lg text-lg font-semibold"
+          disabled={isSaving}
+          className={`w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 px-6 rounded-xl hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-4 focus:ring-green-300 focus:ring-offset-2 transition-all duration-300 transform hover:scale-105 shadow-lg text-lg font-semibold ${
+            isSaving ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
-          🌱 Calculate My Carbon Footprint
+          {isSaving ? '💾 Saving...' : '🌱 Calculate My Carbon Footprint'}
         </button>
       </form>
     </div>

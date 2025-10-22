@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
-import { Leaf, TrendingUp, Lightbulb, BarChart3, Target, Zap, Car, Plane } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Leaf, TrendingUp, Lightbulb, BarChart3, Target, Zap, Car, Plane, Database, History } from 'lucide-react';
 import Calculator from '../components/Calculator';
 import Chart from '../components/Chart';
+import { useAuth } from '../contexts/AuthContext';
+import CarbonFootprintService from '../firebase/database';
 
 export default function Dashboard() {
+  const { currentUser } = useAuth();
   const [emissions, setEmissions] = useState(null);
   const [showCalculator, setShowCalculator] = useState(true);
+  const [userStats, setUserStats] = useState(null);
+  const [footprintHistory, setFootprintHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const handleCalculate = (calculatedEmissions) => {
     setEmissions(calculatedEmissions);
@@ -16,6 +22,38 @@ export default function Dashboard() {
     setEmissions(null);
     setShowCalculator(true);
   };
+
+  // Load user data on component mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (currentUser) {
+        try {
+          setLoading(true);
+          const [stats, history] = await Promise.all([
+            CarbonFootprintService.getUserStats(currentUser.uid),
+            CarbonFootprintService.getUserFootprints(currentUser.uid, 5)
+          ]);
+          
+          setUserStats(stats);
+          setFootprintHistory(history);
+          
+          // Set latest footprint if available
+          if (history.length > 0) {
+            setEmissions(history[0].emissions);
+            setShowCalculator(false);
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [currentUser]);
 
   const features = [
     {
@@ -101,6 +139,56 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* User Stats Section */}
+      {currentUser && userStats && (
+        <div className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-forest-green-900 mb-4">
+                Your Carbon Journey
+              </h2>
+              <p className="text-lg text-gray-600">
+                Track your progress and environmental impact
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-mint-50 p-6 rounded-lg text-center">
+                <Database className="h-8 w-8 text-forest-green-600 mx-auto mb-3" />
+                <h3 className="text-2xl font-bold text-forest-green-900 mb-1">
+                  {userStats.totalFootprints}
+                </h3>
+                <p className="text-gray-600">Total Calculations</p>
+              </div>
+
+              <div className="bg-mint-50 p-6 rounded-lg text-center">
+                <TrendingUp className="h-8 w-8 text-forest-green-600 mx-auto mb-3" />
+                <h3 className="text-2xl font-bold text-forest-green-900 mb-1">
+                  {userStats.averageFootprint?.toFixed(1) || '0.0'} kg
+                </h3>
+                <p className="text-gray-600">Average Daily CO₂</p>
+              </div>
+
+              <div className="bg-mint-50 p-6 rounded-lg text-center">
+                <Target className="h-8 w-8 text-forest-green-600 mx-auto mb-3" />
+                <h3 className="text-2xl font-bold text-forest-green-900 mb-1">
+                  {userStats.activeGoals || 0}
+                </h3>
+                <p className="text-gray-600">Active Goals</p>
+              </div>
+
+              <div className="bg-mint-50 p-6 rounded-lg text-center">
+                <History className="h-8 w-8 text-forest-green-600 mx-auto mb-3" />
+                <h3 className="text-2xl font-bold text-forest-green-900 mb-1">
+                  {userStats.completedGoals || 0}
+                </h3>
+                <p className="text-gray-600">Completed Goals</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Calculator Section */}
       <div className="py-16 bg-mint-50">
