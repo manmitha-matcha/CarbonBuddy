@@ -6,12 +6,14 @@
   "engines": {
     "node": ">=18.0.0 <21.0.0"
   },
+ 
+
   "scripts": {
-    "start": "vite",
     "dev": "vite",
     "build": "npm run build:vite",
     "build:vite": "node ./node_modules/vite/bin/vite.js build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "start": "vite preview",
     "preview": "vite preview"
   },
   "dependencies": {
